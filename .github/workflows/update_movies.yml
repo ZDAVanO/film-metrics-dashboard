@@ -1,0 +1,36 @@
+name: Scheduled Movie Data Update
+
+on:
+  # schedule:
+  #   # Runs daily at 00:00 UTC
+  #   - cron: "0 0 * * *"
+  # Allows manual script run via the Actions tab on GitHub
+  workflow_dispatch:
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          cd scraper
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Always install these libraries if not present in requirements.txt
+          pip install requests firebase-admin
+
+      - name: Run Scraper Script
+        env:
+          TMDB_BEARER_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          cd scraper
+          python update_movies.py
