@@ -27,9 +27,14 @@ HEADERS = {
     "Authorization": f"Bearer {TMDB_BEARER_TOKEN}"
 }
 
+# --- FILTERING CRITERIA ---
+# Minimum number of votes to consider a movie "well-reviewed"
+MIN_VOTE_COUNT = 10
+# Minimum rating to consider
+MIN_RATING = 0.1
+
 # Connect to Firebase
 def initialize_firebase():
-    # 1. First, check if data is in environment variables (for GitHub Actions)
     firebase_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     
     if firebase_json:
@@ -71,123 +76,92 @@ def fetch_genre_map():
 
 
 
+# --- HELPERS: DATA CLEANING ---
+
+def is_valid_movie(m, min_votes=0):
+    """Checks if the movie meets our quality criteria."""
+    if not m.get("poster_path"):
+        return False
+    if not m.get("vote_average") or m.get("vote_average") == 0:
+        return False
+    if m.get("vote_count", 0) < min_votes:
+        return False
+    return True
+
+
+def format_movie_data(m, genre_map):
+    """Transforms API raw data into our internal dictionary format."""
+    genre_names = [genre_map.get(gid, "Other") for gid in m.get("genre_ids", [])] if m.get("genre_ids") else ["Other"]
+    return {
+        "id": m["id"],
+        "title": m["title"],
+        "rating": m["vote_average"],
+        "genres": genre_names,
+        "poster_path": m.get("poster_path"),
+        "release_date": m.get("release_date"),
+        "popularity": m.get("popularity"),
+        "vote_count": m.get("vote_count")
+    }
+
+
+
 # --- LAB 1: DATA EXTRACTION ---
 
-# MARK: get_popular_movies()
-def get_popular_movies(genre_map, pages=1):
-    """Fetches data from the API and maps genre names."""
+# MARK: get_now_playing_movies()
+def get_now_playing_movies(genre_map, pages=2):
+    """Fetches movies currently in theaters (Now Playing)."""
     processed_movies = []
-    seen_ids = set()
-    duplicates_count = 0
     
-    logger.info(f"Loading and processing {pages} pages of movies...")
+    logger.info(f"Loading and processing {pages} pages of 'Now Playing' movies...")
     for page in range(1, pages + 1):
-        url = f"{BASE_URL}/movie/popular?language=en-US&page={page}"
+        url = f"{BASE_URL}/movie/now_playing?language=en-US&page={page}"
         response = requests.get(url, headers=HEADERS)
         time.sleep(0.3)
         if response.status_code == 200:
             movies_on_page = response.json().get("results", [])
             for m in movies_on_page:
-                # Skip duplicates
-                if m["id"] in seen_ids:
-                    duplicates_count += 1
-                    continue
-                
-                seen_ids.add(m["id"])
-                
-                # Map all genre IDs to names for each movie
-                genre_names = [genre_map.get(gid, "Other") for gid in m["genre_ids"]] if m["genre_ids"] else ["Other"]
-                processed_movies.append({
-                    "id": m["id"],
-                    "title": m["title"],
-                    "rating": m["vote_average"],
-                    "genres": genre_names,
-                    "poster_path": m.get("poster_path"),
-                    "release_date": m.get("release_date"),
-                    "popularity": m.get("popularity"),
-                    "vote_count": m.get("vote_count")
-                })
-            logger.info(f"  [{page}/{pages}] Processed {len(movies_on_page)} movies (total: {len(processed_movies)}, duplicates: {duplicates_count})")
+                if is_valid_movie(m):
+                    processed_movies.append(format_movie_data(m, genre_map))
+            
+            logger.info(f"  [{page}/{pages}] Processed 'Now Playing' page")
         else:
-            logger.warning(f"  Error on page {page}: status {response.status_code}")
+            logger.warning(f"  Error on page {page} for 'Now Playing': status {response.status_code}")
 
-    logger.info(f"Processing complete. Total {len(processed_movies)} unique movies")
-    if duplicates_count > 0:
-        logger.warning(f"Skipped {duplicates_count} duplicate movies")
+    logger.info(f"Found {len(processed_movies)} 'Now Playing' records")
     return processed_movies
 
 
-
-# MARK: get_representative_movies()
-def get_representative_movies(genre_map, target_per_genre=100):
+# MARK: get_movies_by_genres()
+def get_movies_by_genres(genre_map, target_per_genre=100):
     """
-    Retrieves an even number of popular movies for each genre,
-    to ensure representativeness for analytics.
+    Retrieves popular movies for each genre from the map.
     """
     processed_movies = []
-    seen_ids = set()
-    duplicates_count = 0
     
-    logger.info(f"Starting collection (target: {target_per_genre} movies for each of {len(genre_map)} genres)...")
+    logger.info(f"Starting collection by genres (target: ~{target_per_genre} movies for each of {len(genre_map)} genres)...")
     
-    # Calculate how many pages to fetch for one genre (API returns 20 movies per page)
-    pages_to_fetch = math.ceil(target_per_genre / 20)
+    max_pages_to_search = math.ceil(target_per_genre / 20)
 
     for genre_id, genre_name in genre_map.items():
         logger.info(f"Processing genre: {genre_name}...")
-        movies_collected_for_this_genre = 0
         
-        for page in range(1, pages_to_fetch + 1):
-            # If we've already collected the required amount for this genre, stop the loop
-            if movies_collected_for_this_genre >= target_per_genre:
-                break
-            
-            # Use the discover endpoint with the with_genres parameter
-            url = f"{BASE_URL}/discover/movie?language=en-US&sort_by=popularity.desc&with_genres={genre_id}&page={page}"
+        for page in range(1, max_pages_to_search + 1):
+            url = f"{BASE_URL}/discover/movie?language=en-US&sort_by=popularity.desc&with_genres={genre_id}&page={page}&vote_count.gte={MIN_VOTE_COUNT}"
             response = requests.get(url, headers=HEADERS)
             time.sleep(0.3)
-            if response.status_code == 200:
-                movies_on_page = response.json().get("results", [])
-                
-                # If movies for this genre are finished
-                if not movies_on_page:
-                    break
-                
-                for m in movies_on_page:
-                    # Control the limit within the page
-                    if movies_collected_for_this_genre >= target_per_genre:
-                        break
-                    
-                    # If the movie was already found in another genre (e.g., it's both Action and Comedy)
-                    if m["id"] in seen_ids:
-                        duplicates_count += 1
-                        movies_collected_for_this_genre += 1 # Count it as found so we don't fetch extra
-                        continue
-                    
-                    seen_ids.add(m["id"])
-                    movies_collected_for_this_genre += 1
-                    
-                    # Map genre IDs to their names
-                    genre_names = [genre_map.get(gid, "Other") for gid in m.get("genre_ids", [])] if m.get("genre_ids") else ["Other"]
-                    
-                    # Collect data, keeping requirements (title, genre, rating)
-                    processed_movies.append({
-                        "id": m["id"],
-                        "title": m["title"], # Requirement: title
-                        "rating": m["vote_average"], # Requirement: rating
-                        "genres": genre_names, # Requirement: genre
-                        "poster_path": m.get("poster_path"),
-                        "release_date": m.get("release_date"),
-                        "popularity": m.get("popularity"),
-                        "vote_count": m.get("vote_count")
-                    })
-            else:
+            
+            if response.status_code != 200:
                 logger.warning(f"  Error for genre {genre_name}, page {page}: status {response.status_code}")
                 break
 
-    logger.info(f"Collection complete. Collected {len(processed_movies)} unique movies.")
-    if duplicates_count > 0:
-        logger.warning(f"Skipped {duplicates_count} duplicates (movies belonging to multiple genres).")
+            movies_on_page = response.json().get("results", [])
+            if not movies_on_page:
+                break
+                
+            for m in movies_on_page:
+                if is_valid_movie(m):
+                    processed_movies.append(format_movie_data(m, genre_map))
+
     return processed_movies
 
 
@@ -297,8 +271,16 @@ if __name__ == "__main__":
     genre_map = fetch_genre_map()
     logger.info(f"Received {len(genre_map)} genres")
 
-    raw_data = get_representative_movies(genre_map, target_per_genre=100)
-    logger.info(f"Collected {len(raw_data)} movies.")
+    # Fetch different sets of movies independently
+    now_playing = get_now_playing_movies(genre_map, pages=2)
+    genres_data = get_movies_by_genres(genre_map, target_per_genre=150)
+    
+    # Merge and remove duplicates using movie ID as key
+    all_raw = now_playing + genres_data
+    unique_map = {m["id"]: m for m in all_raw}
+    raw_data = list(unique_map.values())
+    
+    logger.info(f"Final collection size: {len(raw_data)} unique movies.")
 
     # 2. Processing
     genre_stats = calculate_stats(raw_data)
