@@ -29,8 +29,8 @@ export default function Header() {
 
   return (
     <div className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b">
-      <header className="w-full px-3 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+      <header className="w-full py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 px-4 md:px-8">
 
           {/* <Link href="/" className="text-lg sm:text-xl font-bold shrink-0 min-w-[80px]">
             film-metrics-dashboard

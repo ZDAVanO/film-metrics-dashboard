@@ -147,6 +147,62 @@ export const getMovies = async (params: MovieSearchParams): Promise<GetMoviesRes
     }
 };
 
+export interface YearlyStats {
+    topBestYears: { year: string; avgRating: string; count: number }[];
+    topProductiveYears: { year: string; count: number; avgRating: string }[];
+}
+
+export interface GenreDiversityStats {
+    avgGenresPerMovie: string;
+    topTandems: { pair: string; count: number }[];
+}
+
+interface GlobalAppStats {
+    yearly_stats: YearlyStats;
+    genre_diversity: GenreDiversityStats;
+    hidden_gems: Movie[];
+    updated_at: any;
+}
+
+// Fetch pre-calculated global stats from Firestore (calculated by Python scraper)
+export const getGlobalAppStats = unstable_cache(
+    async (): Promise<GlobalAppStats | null> => {
+        try {
+            const doc = await db.collection('stats').doc('global').get();
+            if (doc.exists) {
+                return doc.data() as GlobalAppStats;
+            }
+            return null;
+        } catch (error) {
+            console.error("Error fetching global stats from Firestore:", error);
+            return null;
+        }
+    },
+    ['global-app-stats'],
+    { revalidate: 3600, tags: ['stats'] }
+);
+
+export const getYearlyStats = async (): Promise<YearlyStats | null> => {
+    const stats = await getGlobalAppStats();
+    return stats?.yearly_stats || null;
+};
+
+export const getGenreDiversityStats = async (): Promise<GenreDiversityStats | null> => {
+    const stats = await getGlobalAppStats();
+    return stats?.genre_diversity || null;
+};
+
+export const getGlobalUpdatedAt = async () => {
+    const stats = await getGlobalAppStats();
+    return stats?.updated_at || null;
+};
+
+export const getHiddenGems = async (limit: number = 10): Promise<Movie[]> => {
+    const stats = await getGlobalAppStats();
+    const gems = stats?.hidden_gems || [];
+    return gems.slice(0, limit);
+}
+
 export const getMovieCount = unstable_cache(
     async (): Promise<number> => {
         try {

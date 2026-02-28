@@ -7,6 +7,7 @@ export interface Genre {
     genre_name: string;
     average_rating: number;
     movie_count: number;
+    engagement_score?: number;
     [key: string]: any;
 }
 
@@ -63,12 +64,14 @@ export const getGlobalStats = async () => {
     const highestRatedGenre = [...genres].sort((a, b) => b.average_rating - a.average_rating)[0];
     const mostPopularGenre = [...genres].sort((a, b) => b.average_popularity - a.average_popularity)[0];
     const largestGenre = [...genres].sort((a, b) => b.movie_count - a.movie_count)[0];
+    const mostEngagedGenre = [...genres].sort((a, b) => (b.engagement_score || 0) - (a.engagement_score || 0))[0];
 
     return {
         avgRating: avgRating.toFixed(2),
         highestRatedGenre,
         mostPopularGenre,
         largestGenre,
+        mostEngagedGenre,
         totalGenres: genres.length,
         totalMovies,
         totalVotes

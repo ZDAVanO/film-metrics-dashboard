@@ -36,7 +36,7 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
     const currentOrder = (searchParams.get("sortOrder") || "desc") as "asc" | "desc";
     const currentInclude = searchParams.get("includeGenres")?.split(",").filter(Boolean) || [];
     const currentExclude = searchParams.get("excludeGenres")?.split(",").filter(Boolean) || [];
-    const currentMinYear = parseInt(searchParams.get("minYear") || "1900");
+    const currentMinYear = parseInt(searchParams.get("minYear") || "1980");
     const currentMaxYear = parseInt(searchParams.get("maxYear") || "2026");
 
     const [yearRange, setYearRange] = useState([currentMinYear, currentMaxYear]);
@@ -61,7 +61,7 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
         });
 
         // Omit default values to keep URL clean
-        if (params.get("minYear") === "1900") params.delete("minYear");
+        if (params.get("minYear") === "1980") params.delete("minYear");
         if (params.get("maxYear") === "2026") params.delete("maxYear");
         if (params.get("sortBy") === "popularity") params.delete("sortBy");
         if (params.get("sortOrder") === "desc") params.delete("sortOrder");
@@ -123,7 +123,7 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
         router.push("/browser");
     };
 
-    const hasFilters = currentInclude.length > 0 || currentExclude.length > 0 || currentMinYear !== 1900 || currentMaxYear !== 2026;
+    const hasFilters = currentInclude.length > 0 || currentExclude.length > 0 || currentMinYear !== 1980 || currentMaxYear !== 2026;
 
     return (
         <div className="flex flex-wrap items-center gap-3">
@@ -132,10 +132,10 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
                 <div className="flex items-center gap-1">
                     <PopoverTrigger asChild>
                         <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             className={cn(
-                                "rounded-full bg-muted/20 border-border/60 font-medium text-xs h-9 px-4 gap-2 transition-all",
+                                "rounded-full bg-muted/20 border border-border/70 font-medium text-xs h-9 px-4 gap-2 transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary",
                                 (currentInclude.length > 0 || currentExclude.length > 0) && "border-primary/50 bg-primary/5 text-primary pr-2"
                             )}
                         >
@@ -172,7 +172,7 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
                     </div>
 
                     <div className="p-4 grid grid-cols-3 gap-2">
-                        {genres.map((genre) => {
+                        {[...genres].sort((a, b) => a.genre_name.localeCompare(b.genre_name)).map((genre) => {
                             const isIncluded = tempInclude.includes(genre.genre_name);
                             const isExcluded = tempExclude.includes(genre.genre_name);
 
@@ -215,20 +215,20 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
                 <div className="flex items-center gap-1">
                     <PopoverTrigger asChild>
                         <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             className={cn(
-                                "rounded-full bg-muted/20 border-border/60 font-medium text-xs h-9 px-4 gap-2 transition-all",
-                                (currentMinYear !== 1900 || currentMaxYear !== 2026) && "border-primary/50 bg-primary/5 text-primary pr-2"
+                                "rounded-full bg-muted/20 border border-border/70 font-medium text-xs h-9 px-4 gap-2 transition-all hover:border-primary/50 hover:bg-primary/10 hover:text-primary",
+                                (currentMinYear !== 1980 || currentMaxYear !== 2026) && "border-primary/50 bg-primary/5 text-primary pr-2"
                             )}
                         >
                             <Calendar className="size-3.5" />
                             <span>
-                                {currentMinYear === 1900 && currentMaxYear === 2026
+                                {currentMinYear === 1980 && currentMaxYear === 2026
                                     ? "Years"
                                     : `${currentMinYear} - ${currentMaxYear}`}
                             </span>
-                            {(currentMinYear !== 1900 || currentMaxYear !== 2026) && (
+                            {(currentMinYear !== 1980 || currentMaxYear !== 2026) && (
                                 <div
                                     role="button"
                                     onClick={(e) => {
@@ -256,7 +256,7 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
                         <div className="py-2">
                             <Slider
                                 value={yearRange}
-                                min={1900}
+                                min={1980}
                                 max={2026}
                                 step={1}
                                 onValueChange={setYearRange}
@@ -280,9 +280,9 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
             {/* Sort Filter */}
             <div className="flex items-center gap-2">
                 <Select value={currentSort} onValueChange={handleSortChange}>
-                    <SelectTrigger className="rounded-full bg-muted/20 border-border/60 font-medium text-xs focus:ring-primary/20 h-9 min-w-[130px]">
+                    <SelectTrigger className="!rounded-full !bg-muted/20 !border !border-border/70 font-medium text-xs focus:ring-primary/20 h-9 min-w-[130px] transition-all hover:!border-primary/50 hover:!bg-primary/10 hover:!text-primary px-4 shadow-none">
                         <div className="flex items-center gap-2">
-                            <ListFilter className="size-3.5 text-primary" />
+                            <ListFilter className="size-3.5" />
                             <SelectValue placeholder="Sort by" />
                         </div>
                     </SelectTrigger>
@@ -300,10 +300,10 @@ export function MovieFilters({ genres }: MovieFiltersProps) {
                 </Select>
 
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
                     onClick={toggleOrder}
-                    className="rounded-full size-9 bg-muted/20 border-border/60 hover:bg-primary/10 hover:text-primary transition-all active:scale-95 shrink-0"
+                    className="rounded-full size-9 bg-muted/20 border border-border/70 hover:border-primary/50 hover:bg-primary/10 hover:text-primary transition-all active:scale-95 shrink-0"
                     title={currentOrder === "desc" ? "Descending" : "Ascending"}
                 >
                     {currentOrder === "desc" ? (

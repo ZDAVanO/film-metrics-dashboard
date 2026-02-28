@@ -9,6 +9,7 @@ interface GenreCardProps {
         genre_name: string;
         average_rating: number;
         movie_count: number;
+        engagement_score?: number;
         top_movies?: {
             id: string | number;
             title?: string;
@@ -79,9 +80,13 @@ export function GenreCard({ genre }: GenreCardProps) {
                                 {genre.average_rating}
                             </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-[0.15em] transition-colors group-hover:text-foreground">
-                            {genre.movie_count} Movies
-                        </p>
+                        <div className="flex items-start gap-6 text-[11px] text-muted-foreground font-bold uppercase tracking-[0.15em] transition-colors group-hover:text-foreground">
+                            {genre.engagement_score && (
+                                <div className="flex flex-col gap-0.5">
+                                    <span>{genre.engagement_score.toLocaleString()} Engagement</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="h-1 w-0 bg-primary transition-all duration-300 group-hover:w-16 mt-3" />
                 </div>
