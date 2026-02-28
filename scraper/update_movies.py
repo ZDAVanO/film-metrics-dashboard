@@ -1,25 +1,21 @@
+import json
 import math
 import os
-import json
 import time
 from collections import defaultdict
 
-from dotenv import load_dotenv
-load_dotenv()
-
-import requests
 import firebase_admin
+import requests
+from dotenv import load_dotenv
 from firebase_admin import credentials, firestore
 
 from utils.logger import get_logger
 
-
+# --- INITIALIZATION AND CONFIGURATION ---
+load_dotenv()
 logger = get_logger(__name__)
 
-
-
-# --- CONFIGURATION AND INITIALIZATION ---
-
+# TMDB API Configuration
 BASE_URL = "https://api.themoviedb.org/3"
 TMDB_BEARER_TOKEN = os.getenv("TMDB_BEARER_TOKEN")
 HEADERS = {
@@ -27,14 +23,25 @@ HEADERS = {
     "Authorization": f"Bearer {TMDB_BEARER_TOKEN}"
 }
 
-# --- FILTERING CRITERIA ---
-# Minimum number of votes to consider a movie "well-reviewed"
+# Filtering Criteria
 MIN_VOTE_COUNT = 10
-# Minimum rating to consider
 MIN_RATING = 0.1
 
-# Connect to Firebase
+# Global Decades for Movie Collection
+DECADES = [
+    ("1980-01-01", "1989-12-31"),
+    ("1990-01-01", "1999-12-31"),
+    ("2000-01-01", "2009-12-31"),
+    ("2010-01-01", "2019-12-31"),
+    ("2020-01-01", "2029-12-31")
+]
+
+
+# --- FIREBASE SETUP ---
+
+# MARK: initialize_firebase()
 def initialize_firebase():
+    """Initializes the Firebase Admin SDK and returns the Firestore client."""
     firebase_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
     
     if firebase_json:
@@ -58,39 +65,25 @@ def initialize_firebase():
         firebase_admin.initialize_app(cred)
     return firestore.client()
 
+# Initialize Firebase globally for use in other functions
 db = initialize_firebase()
 
 
+# --- HELPERS: DATA CLEANING AND TRANSFORMATION ---
 
-# MARK: fetch_genre_map()
-def fetch_genre_map():
-    """Fetches the genre map from the TMDB API."""
-    url = f"{BASE_URL}/genre/movie/list?language=en"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        genres = response.json().get("genres", [])
-        return {g["id"]: g["name"] for g in genres}
-    else:
-        logger.warning("Failed to fetch genres from API, using fallback.")
-        return {}
-
-
-
-# --- HELPERS: DATA CLEANING ---
-
+# MARK: is_valid_movie()
 def is_valid_movie(m, min_votes=0):
     """Checks if the movie meets our quality criteria."""
-    if not m.get("poster_path"):
-        return False
-    if not m.get("vote_average") or m.get("vote_average") == 0:
-        return False
-    if m.get("vote_count", 0) < min_votes:
-        return False
-    return True
+    return bool(
+        m.get("poster_path")
+        and m.get("vote_average", 0) > 0
+        and m.get("vote_count", 0) >= min_votes
+    )
 
 
+# MARK: format_movie_data()
 def format_movie_data(m, genre_map):
-    """Transforms API raw data into our internal dictionary format."""
+    """Transforms TMDB API raw data into our internal dictionary format."""
     genre_names = [genre_map.get(gid, "Other") for gid in m.get("genre_ids", [])] if m.get("genre_ids") else ["Other"]
     return {
         "id": m["id"],
@@ -104,8 +97,20 @@ def format_movie_data(m, genre_map):
     }
 
 
+# --- API DATA EXTRACTION ---
 
-# --- LAB 1: DATA EXTRACTION ---
+# MARK: fetch_genre_map()
+def fetch_genre_map():
+    """Fetches the genre map from the TMDB API."""
+    url = f"{BASE_URL}/genre/movie/list?language=en"
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        genres = response.json().get("genres", [])
+        return {g["id"]: g["name"] for g in genres}
+    else:
+        logger.warning("Failed to fetch genres from API, using fallback.")
+        return {}
+
 
 # MARK: get_now_playing_movies()
 def get_now_playing_movies(genre_map, pages=2):
@@ -132,41 +137,53 @@ def get_now_playing_movies(genre_map, pages=2):
 
 
 # MARK: get_movies_by_genres()
-def get_movies_by_genres(genre_map, target_per_genre=100):
+def get_movies_by_genres(genre_map):
     """
-    Retrieves popular movies for each genre from the map.
+    Retrieves popular movies for each genre, stratified by decades 
+    to ensure a diverse and historically rich dataset.
     """
     processed_movies = []
     
-    logger.info(f"Starting collection by genres (target: ~{target_per_genre} movies for each of {len(genre_map)} genres)...")
-    
-    max_pages_to_search = math.ceil(target_per_genre / 20)
+    logger.info(f"Starting collection by genres (stratified by {len(DECADES)} decades)...")
 
-    for genre_id, genre_name in genre_map.items():
-        logger.info(f"Processing genre: {genre_name}...")
+    genre_items = list(genre_map.items())
+    total_genres = len(genre_items)
+
+    for g_idx, (genre_id, genre_name) in enumerate(genre_items, 1):
+        logger.info(f"[{g_idx}/{total_genres}] Processing genre: {genre_name}...")
         
-        for page in range(1, max_pages_to_search + 1):
-            url = f"{BASE_URL}/discover/movie?language=en-US&sort_by=popularity.desc&with_genres={genre_id}&page={page}&vote_count.gte={MIN_VOTE_COUNT}"
-            response = requests.get(url, headers=HEADERS)
-            time.sleep(0.3)
-            
-            if response.status_code != 200:
-                logger.warning(f"  Error for genre {genre_name}, page {page}: status {response.status_code}")
-                break
-
-            movies_on_page = response.json().get("results", [])
-            if not movies_on_page:
-                break
+        for start_date, end_date in DECADES:
+            # Fetch up to 3 pages (60 movies) per decade for each genre
+            for page in range(1, 4):
+                url = (f"{BASE_URL}/discover/movie?language=en-US"
+                       f"&sort_by=popularity.desc"
+                       f"&with_genres={genre_id}"
+                       f"&primary_release_date.gte={start_date}"
+                       f"&primary_release_date.lte={end_date}"
+                       f"&page={page}"
+                       f"&vote_count.gte={MIN_VOTE_COUNT}")
                 
-            for m in movies_on_page:
-                if is_valid_movie(m):
-                    processed_movies.append(format_movie_data(m, genre_map))
+                response = requests.get(url, headers=HEADERS)
+                time.sleep(0.2) # Small delay to avoid API rate limiting
+                
+                if response.status_code != 200:
+                    logger.warning(f"  [{g_idx}/{total_genres}] Error for {genre_name}, decade {start_date[:4]}, page {page}: status {response.status_code}")
+                    break
+
+                movies_on_page = response.json().get("results", [])
+                if not movies_on_page:
+                    break
+                    
+                for m in movies_on_page:
+                    if is_valid_movie(m):
+                        processed_movies.append(format_movie_data(m, genre_map))
+                
+                logger.info(f"  [{g_idx}/{total_genres}]   Decade {start_date[:4]} | Page {page} processed")
 
     return processed_movies
 
 
-
-# --- LAB 2: PROCESSING ---
+# --- DATA PROCESSING AND STATISTICS ---
 
 # MARK: calculate_stats()
 def calculate_stats(movies, top_count=10):
@@ -203,8 +220,16 @@ def calculate_stats(movies, top_count=10):
         avg_popularity = sum(m.get("popularity", 0) for m in genre_movies) / movie_count
         total_votes = sum(m.get("vote_count", 0) for m in genre_movies)
 
-        # Find Top-N movies by rating for the genre
-        top_movies = sorted(genre_movies, key=lambda x: x["rating"], reverse=True)[:top_count]
+        # Find Top-N representative movies for the genre.
+        # We use a weighted score to favor movies with fewer genres (Genre Purity).
+        # This makes posters on genre cards more unique and diverse.
+        top_movies = sorted(
+            genre_movies,
+            key=lambda x: (x.get("popularity", 0) * x.get("rating", 0)) / len(x.get("genres", [1])),
+            reverse=True
+        )[:top_count]
+
+        engagement_score = total_votes / movie_count if movie_count > 0 else 0
 
         genre_extended_stats.append({
             "genre_name": genre,
@@ -212,22 +237,121 @@ def calculate_stats(movies, top_count=10):
             "average_popularity": round(avg_popularity, 2),
             "total_votes": total_votes,
             "movie_count": movie_count,
+            "engagement_score": round(engagement_score, 2),
             "top_movies": top_movies
         })
 
     return genre_extended_stats
 
 
+# MARK: _get_yearly_stats()
+def _get_yearly_stats(movies):
+    """Helper to calculate yearly best and most productive years for global stats."""
+    year_groups = defaultdict(lambda: {"total_rating": 0, "count": 0})
+    for m in movies:
+        if m.get("release_date"):
+            year = m["release_date"].split("-")[0]
+            year_groups[year]["total_rating"] += (m.get("rating") or 0)
+            year_groups[year]["count"] += 1
+    
+    years = [
+        {
+            "year": year,
+            "avg_rating": data["total_rating"] / data["count"],
+            "count": data["count"],
+        }
+        for year, data in year_groups.items()
+        if data["count"] > 0
+    ]
+    
+    # Top 5 Best Years (Quality) - min 15 movies for statistical significance
+    top_best_years = sorted(
+        [y for y in years if y["count"] >= 15],
+        key=lambda x: x["avg_rating"],
+        reverse=True
+    )[:5]
+    
+    # Top 5 Most Productive Years (Quantity)
+    top_productive_years = sorted(years, key=lambda x: x["count"], reverse=True)[:5]
+    
+    return {
+        "topBestYears": [{
+            "year": y["year"],
+            "avgRating": f"{y['avg_rating']:.2f}",
+            "count": y["count"]
+        } for y in top_best_years],
+        "topProductiveYears": [{
+            "year": y["year"],
+            "count": y["count"],
+            "avgRating": f"{y['avg_rating']:.2f}"
+        } for y in top_productive_years]
+    }
 
-# --- LAB 3: CLOUD STORAGE ---
+
+# MARK: _get_genre_diversity()
+def _get_genre_diversity(movies):
+    """Helper to calculate genre combinations and averages for global stats."""
+    total_genres_count = sum(len(m.get("genres", [])) for m in movies)
+    pair_counts = defaultdict(int)
+    for m in movies:
+        genres = m.get("genres", [])
+        if len(genres) > 1:
+            sorted_genres = sorted(genres)
+            for i in range(len(sorted_genres)):
+                for j in range(i + 1, len(sorted_genres)):
+                    pair = f"{sorted_genres[i]} + {sorted_genres[j]}"
+                    pair_counts[pair] += 1
+    
+    top_tandems = sorted(
+        [{"pair": pair, "count": count} for pair, count in pair_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True
+    )[:5]
+    
+    return {
+        "avgGenresPerMovie": f"{(total_genres_count / len(movies)):.1f}" if movies else "0.0",
+        "topTandems": top_tandems
+    }
+
+
+# MARK: _get_hidden_gems()
+def _get_hidden_gems(movies):
+    """Helper to find high-rated but less popular movies for global stats."""
+    hidden_gems = [
+        m for m in movies 
+        if (m.get("rating") or 0) >= 7.8 and 
+           (m.get("popularity") or 0) < 25 and 
+           200 <= (m.get("vote_count") or 0) < 1500 and
+           "Documentary" not in m.get("genres", []) and
+           "Animation" not in m.get("genres", []) and
+           "TV Movie" not in m.get("genres", []) and
+           m.get("release_date") and int(m["release_date"].split("-")[0]) >= 2000
+    ]
+    return sorted(hidden_gems, key=lambda x: x["rating"], reverse=True)[:15]
+
+
+# MARK: calculate_global_stats()
+def calculate_global_stats(movies):
+    """Calculates yearly trends, genre diversity and hidden gems."""
+    return {
+        "yearly_stats": _get_yearly_stats(movies),
+        "genre_diversity": _get_genre_diversity(movies),
+        "hidden_gems": _get_hidden_gems(movies),
+        "updated_at": firestore.SERVER_TIMESTAMP
+    }
+
+
+# --- CLOUD STORAGE OPERATIONS (FIRESTORE) ---
 
 # MARK: upload_to_firebase()
-def upload_to_firebase(movies, stats):
-    """Writes data to Firestore using batches for better performance."""
+def upload_to_firebase(movies, stats, global_stats):
+    """Writes processed data to Firestore using batches and removes obsolete records."""
     
-    # --- 1. Loading movies in batches ---
-    logger.info(f"Uploading {len(movies)} movies to Firestore in batches...")
+    # 1. Collect new movie IDs for fast lookup
+    new_movie_ids = {str(movie["id"]) for movie in movies}
 
+    # --- 1. Upload movies in batches ---
+    logger.info(f"Uploading {len(movies)} movies to Firestore in batches...")
     batch_size = 500
     for i in range(0, len(movies), batch_size):
         batch = db.batch()
@@ -238,34 +362,58 @@ def upload_to_firebase(movies, stats):
             batch.set(movie_ref, movie)
 
         batch.commit()
-        logger.info(f"  Batch {i // batch_size + 1} (movies) completed")
+        logger.info(f"  Batch {i // batch_size + 1} (movies) uploaded")
 
-    # --- 2. Updating genre statistics ---
-    logger.info("Updating genre statistics...")
+    # --- 2. Update stats ---
+    logger.info("Updating genre and global statistics...")
     batch = db.batch()
     for s in stats:
         genre_ref = db.collection("genres").document(s["genre_name"].lower())
         batch.set(genre_ref, s)
-    
     batch.commit()
+    db.collection("stats").document("global").set(global_stats)
 
-    logger.info("All data successfully synchronized with the cloud using batches!")
+    # --- 3. Cleaning obsolete movies ---
+    logger.info("Checking for obsolete movies...")
+    
+    # Get all existing document IDs in the collection
+    # Use select([]), to avoid fetching full document data (saves bandwidth)
+    existing_docs = db.collection("movies").select([]).stream()
+    existing_ids = {doc.id for doc in existing_docs}
 
+    # Find the difference: what is in the database but not in the new list
+    ids_to_delete = list(existing_ids - new_movie_ids)
+
+    if ids_to_delete:
+        logger.info(f"Found {len(ids_to_delete)} obsolete movies. Deleting...")
+        for i in range(0, len(ids_to_delete), batch_size):
+            batch = db.batch()
+            chunk_to_delete = ids_to_delete[i : i + batch_size]
+            
+            for doc_id in chunk_to_delete:
+                doc_ref = db.collection("movies").document(doc_id)
+                batch.delete(doc_ref)
+                
+            batch.commit()
+            logger.info(f"  Deleted batch of {len(chunk_to_delete)} old movies")
+    else:
+        logger.info("No obsolete movies to remove")
+
+    logger.info("Data synchronization complete")
 
 
 # MARK: clear_firestore()
 def clear_firestore():
-    """Deletes all documents from the 'movies' and 'genres' collections."""
-    collections = ["movies", "genres"]
+    """Deletes all documents from the primary collections."""
+    collections = ["movies", "genres", "stats"]
     for col in collections:
         db.recursive_delete(db.collection(col))
-        print(f"Deleted all documents from collection '{col}'")
+        logger.info(f"Deleted all documents from collection '{col}'")
 
 
+# --- MAIN EXECUTION ---
 
-# MARK: main
 if __name__ == "__main__":
-
     # 1. Extraction
     logger.info("Loading genres...")
     genre_map = fetch_genre_map()
@@ -273,7 +421,7 @@ if __name__ == "__main__":
 
     # Fetch different sets of movies independently
     now_playing = get_now_playing_movies(genre_map, pages=2)
-    genres_data = get_movies_by_genres(genre_map, target_per_genre=150)
+    genres_data = get_movies_by_genres(genre_map)
     
     # Merge and remove duplicates using movie ID as key
     all_raw = now_playing + genres_data
@@ -284,11 +432,8 @@ if __name__ == "__main__":
 
     # 2. Processing
     genre_stats = calculate_stats(raw_data)
-    logger.info(f"Calculated statistics for {len(genre_stats)} genres.")
+    global_stats = calculate_global_stats(raw_data)
+    logger.info(f"Calculated statistics for {len(genre_stats)} genres and global trends.")
 
-    # 3. Cloud
-    upload_to_firebase(raw_data, genre_stats)
-
-    # --- CLEAR FIRESTORE ---
-    # clear_firestore()
-
+    # 3. Cloud Synchronization
+    upload_to_firebase(raw_data, genre_stats, global_stats)
