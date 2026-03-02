@@ -246,18 +246,20 @@ def calculate_stats(movies, top_count=10):
 
 # MARK: _get_yearly_stats()
 def _get_yearly_stats(movies):
-    """Helper to calculate yearly best and most productive years for global stats."""
-    year_groups = defaultdict(lambda: {"total_rating": 0, "count": 0})
+    """Helper to calculate yearly best and most engaging years for global stats."""
+    year_groups = defaultdict(lambda: {"total_rating": 0, "total_votes": 0, "count": 0})
     for m in movies:
         if m.get("release_date"):
             year = m["release_date"].split("-")[0]
             year_groups[year]["total_rating"] += (m.get("rating") or 0)
+            year_groups[year]["total_votes"] += (m.get("vote_count") or 0)
             year_groups[year]["count"] += 1
     
     years = [
         {
             "year": year,
             "avg_rating": data["total_rating"] / data["count"],
+            "engagement_score": data["total_votes"] / data["count"],
             "count": data["count"],
         }
         for year, data in year_groups.items()
@@ -271,8 +273,12 @@ def _get_yearly_stats(movies):
         reverse=True
     )[:5]
     
-    # Top 5 Most Productive Years (Quantity)
-    top_productive_years = sorted(years, key=lambda x: x["count"], reverse=True)[:5]
+    # Top 5 Most Engaging Years (Impact) - min 15 movies for statistical significance
+    top_engaging_years = sorted(
+        [y for y in years if y["count"] >= 15],
+        key=lambda x: x["engagement_score"],
+        reverse=True
+    )[:5]
     
     return {
         "topBestYears": [{
@@ -280,11 +286,11 @@ def _get_yearly_stats(movies):
             "avgRating": f"{y['avg_rating']:.2f}",
             "count": y["count"]
         } for y in top_best_years],
-        "topProductiveYears": [{
+        "topEngagingYears": [{
             "year": y["year"],
-            "count": y["count"],
+            "engagementScore": round(y["engagement_score"]),
             "avgRating": f"{y['avg_rating']:.2f}"
-        } for y in top_productive_years]
+        } for y in top_engaging_years]
     }
 
 
