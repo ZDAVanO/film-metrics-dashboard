@@ -1,31 +1,31 @@
 "use client"
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { signOut, useSession } from "next-auth/react";
+// import { Button } from "@/components/ui/button";
+// import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 
-import { Separator } from "@/components/ui/separator"
-import { ThemeSubMenu } from "@/components/theme-sub-menu";
+// import { Separator } from "@/components/ui/separator"
+// import { ThemeSubMenu } from "@/components/theme-sub-menu";
 import { ModeToggle } from "@/components/mode-toggle";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+// import {
+//   DropdownMenu,
+//   DropdownMenuTrigger,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuSeparator,
+// } from "@/components/ui/dropdown-menu";
 
 
 
-import { GoogleSignInButton } from "@/components/google-sign-in-button";
+// import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { SearchBar } from "@/components/search-bar";
 import { GenresNav } from "@/components/genres-nav";
 
 
 
 export default function Header() {
-  const { data: session, status } = useSession()
+  // const { data: session, status } = useSession()
 
   return (
     <div className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b">
@@ -60,7 +60,8 @@ export default function Header() {
 
           <div className="flex items-center gap-3 shrink-0">
             <nav className="flex gap-3">
-              {/* 1. Check if data is still loading */}
+              <ModeToggle />
+              {/* Auth UI — commented out, enable when auth is ready
               {status === "loading" ? (
                 <div className="h-8 w-24 rounded-full bg-muted animate-pulse" />
               ) : !session?.user ? (
@@ -114,6 +115,7 @@ export default function Header() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+              */}
             </nav>
           </div>
         </div>

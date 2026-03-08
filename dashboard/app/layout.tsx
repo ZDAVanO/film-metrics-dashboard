@@ -8,9 +8,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 // import LayoutContent from "@/components/LayoutContent";
 
 import { Providers } from "@/components/Providers"
-import { getServerSession } from "next-auth";
+// import { getServerSession } from "next-auth";
 // import { authOptions } from "@/lib/auth";
-import { authOptions } from "@/lib/auth";
 
 import { Toaster } from "@/components/ui/sonner"
 
@@ -33,13 +32,13 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children, }: Readonly<{ children: React.ReactNode; }>) {
-  const session = await getServerSession(authOptions);
+  // const session = await getServerSession(authOptions);
 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} >
 
-        <Providers session={session}>
+        <Providers session={null}>
 
           <ThemeProvider
             attribute="class"
