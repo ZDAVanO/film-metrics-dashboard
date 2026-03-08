@@ -1,9 +1,9 @@
 name: Scheduled Movie Data Update
 
 on:
-  # schedule:
-  #   # Runs daily at 00:00 UTC
-  #   - cron: "0 0 * * *"
+  schedule:
+    # Runs daily at 00:00 UTC
+    - cron: "0 0 * * *"
   # Allows manual script run via the Actions tab on GitHub
   workflow_dispatch:
 
@@ -34,3 +34,14 @@ jobs:
         run: |
           cd scraper
           python update_movies.py
+
+      - name: Trigger Frontend Cache Revalidation
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          echo "Sending revalidation request to $APP_URL..."
+          curl -s -f -X POST "$APP_URL/api/revalidate?secret=$REVALIDATE_SECRET" \
+            -H "Content-Type: application/json" \
+            && echo "✅ Cache revalidation triggered successfully." \
+            || echo "⚠️ Revalidation request failed (site may be unavailable)."
