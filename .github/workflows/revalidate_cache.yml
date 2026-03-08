@@ -1,0 +1,41 @@
+name: Manual Cache Revalidation
+
+on:
+  # Allows manual script run via the Actions tab on GitHub
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to revalidate (optional, e.g. "movies", "genres", "stats")'
+        required: false
+        default: ''
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Frontend Cache Revalidation
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          # Clean APP_URL to remove trailing slash
+          CLEAN_URL=$(echo $APP_URL | sed 's:/*$::')
+          
+          # Construct query string
+          QUERY="secret=$REVALIDATE_SECRET"
+          if [ -n "$TAG" ]; then
+            QUERY="$QUERY&tag=$TAG"
+            echo "Revalidating specialized tag: $TAG"
+          else
+            echo "Revalidating all main entities..."
+          fi
+          
+          echo "Sending revalidation request to $CLEAN_URL/api/revalidate..."
+          
+          # Use -L to follow redirects, -f to fail on 4xx/5xx errors
+          curl -sL -f -X POST "$CLEAN_URL/api/revalidate?$QUERY" \
+            -H "Content-Type: application/json" \
+            && echo "✅ Cache revalidation triggered successfully." \
+            || { echo "❌ Revalidation request failed! Check your logs and secrets (APP_URL/REVALIDATE_SECRET)."; exit 1; }
