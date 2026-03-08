@@ -202,26 +202,26 @@ export default async function Home() {
             </div>
           </Card>
 
-          {/* Most Productive */}
+          {/* Highest Engagement */}
           <Card className="flex flex-col gap-0 p-0 overflow-hidden">
             <div className="bg-muted/30 border-b p-4 sm:px-6 sm:py-4 flex items-center gap-2 font-semibold text-sm">
-              <Film className="h-4 w-4 text-blue-500" />
-              Most Productive Years
+              <Activity className="h-4 w-4 text-rose-500" />
+              Highest Audience Engagement
             </div>
             <div className="flex flex-col gap-0">
               <div className="divide-y text-sm">
-                {yearlyStats.topProductiveYears.map((y, i) => (
+                {yearlyStats.topEngagingYears.map((y, i) => (
                   <Link
                     key={y.year}
                     href={`/browser?minYear=${y.year}&maxYear=${y.year}`}
                     className="flex items-center justify-between p-4 sm:px-6 hover:bg-muted/30 transition-all border-b last:border-0 group/row"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="font-medium text-muted-foreground w-4 text-xs group-hover/row:text-blue-500 transition-colors">#{i + 1}</span>
+                      <span className="font-medium text-muted-foreground w-4 text-xs group-hover/row:text-rose-500 transition-colors">#{i + 1}</span>
                       <span className="font-bold group-hover/row:translate-x-1 transition-transform">{y.year}</span>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className="font-bold text-blue-500">{y.count} <span className="text-[10px] font-normal text-muted-foreground">FILMS</span></span>
+                      <span className="font-bold text-rose-500">{y.engagementScore.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground uppercase">Votes</span></span>
                       <span className="text-xs text-muted-foreground">{y.avgRating} AVG</span>
                     </div>
                   </Link>

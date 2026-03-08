@@ -77,3 +77,16 @@ export const getGlobalStats = async () => {
         totalVotes
     };
 };
+
+export async function getGenre(id: string): Promise<Genre | null> {
+    try {
+        const doc = await db.collection('genres').doc(id.toLowerCase()).get();
+        if (doc.exists) {
+            return { id: doc.id, ...doc.data() } as Genre;
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching genre ${id}:`, error);
+        return null;
+    }
+}

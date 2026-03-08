@@ -149,7 +149,7 @@ export const getMovies = async (params: MovieSearchParams): Promise<GetMoviesRes
 
 export interface YearlyStats {
     topBestYears: { year: string; avgRating: string; count: number }[];
-    topProductiveYears: { year: string; count: number; avgRating: string }[];
+    topEngagingYears: { year: string; engagementScore: number; avgRating: string }[];
 }
 
 export interface GenreDiversityStats {
