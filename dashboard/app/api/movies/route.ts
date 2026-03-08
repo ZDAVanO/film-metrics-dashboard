@@ -2,8 +2,7 @@ import { getMovies, MovieSearchParams } from '@/lib/movies';
 import { NextResponse } from 'next/server';
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request
 ) {
   const { searchParams } = new URL(request.url);
   
