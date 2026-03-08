@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { unstable_cache } from 'next/cache';
 
 
@@ -43,7 +43,7 @@ export interface MovieSearchParams {
 const getAllMovies = unstable_cache(
     async () => {
         try {
-            const snapshot = await db.collection('movies').get();
+            const snapshot = await getDb().collection('movies').get();
             return snapshot.docs.map(doc => ({
                 ...doc.data(),
                 id: doc.id // Ensure Firestore string ID is used and not overwritten
@@ -168,7 +168,7 @@ interface GlobalAppStats {
 export const getGlobalAppStats = unstable_cache(
     async (): Promise<GlobalAppStats | null> => {
         try {
-            const doc = await db.collection('stats').doc('global').get();
+            const doc = await getDb().collection('stats').doc('global').get();
             if (doc.exists) {
                 return doc.data() as GlobalAppStats;
             }
@@ -206,7 +206,7 @@ export const getHiddenGems = async (limit: number = 10): Promise<Movie[]> => {
 export const getMovieCount = unstable_cache(
     async (): Promise<number> => {
         try {
-            const snapshot = await db.collection('movies').count().get();
+            const snapshot = await getDb().collection('movies').count().get();
             return snapshot.data().count;
         } catch (error) {
             console.error("Error fetching movie count:", error);

@@ -1,4 +1,4 @@
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { unstable_cache } from 'next/cache';
 
 
@@ -14,7 +14,7 @@ export interface Genre {
 export const getTopGenres = unstable_cache(
     async (limit: number = 4): Promise<Genre[]> => {
         try {
-            const snapshot = await db.collection('genres')
+            const snapshot = await getDb().collection('genres')
                 .orderBy('average_rating', 'desc')
                 .limit(limit)
                 .get();
@@ -35,7 +35,7 @@ export const getTopGenres = unstable_cache(
 export const getAllGenres = unstable_cache(
     async (): Promise<Genre[]> => {
         try {
-            const snapshot = await db.collection('genres')
+            const snapshot = await getDb().collection('genres')
                 .orderBy('average_rating', 'desc')
                 .get();
 
@@ -80,7 +80,7 @@ export const getGlobalStats = async () => {
 
 export async function getGenre(id: string): Promise<Genre | null> {
     try {
-        const doc = await db.collection('genres').doc(id.toLowerCase()).get();
+        const doc = await getDb().collection('genres').doc(id.toLowerCase()).get();
         if (doc.exists) {
             return { id: doc.id, ...doc.data() } as Genre;
         }
