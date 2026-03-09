@@ -25,22 +25,10 @@ export function GenreCard({ genre }: GenreCardProps) {
 
     return (
         <div className="group relative">
-            {/* Colorful Glow Layer (Blurred duplicate of posters) */}
-            <div className="absolute -inset-0.5 z-0 opacity-0 group-hover:opacity-50 blur-2xl transition-all duration-700 scale-110 pointer-events-none">
-                <div className="grid grid-cols-3 grid-rows-2 gap-0 w-full h-full">
-                    {displayMovies.map((movie, i) => (
-                        <div key={`glow-${movie.id || i}`} className="relative w-full h-full">
-                            <FadeInImage
-                                src={`${TMDB_IMAGE_BASE}${movie.poster_path}`}
-                                alt=""
-                                fill
-                                sizes="100px"
-                                className="object-cover"
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <div
+                className="absolute -inset-0.5 z-0 opacity-0 group-hover:opacity-40 blur-2xl transition-all duration-700 scale-110 pointer-events-none rounded-2xl bg-primary/20"
+                aria-hidden="true"
+            />
 
             <Link
                 href={`/browser?includeGenres=${encodeURIComponent(genre.genre_name)}`}

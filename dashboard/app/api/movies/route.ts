@@ -18,7 +18,12 @@ export async function GET(
 
   try {
     const data = await getMovies(queryParams);
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        // Cache on Vercel Edge for 1 hour; serve stale for up to 24h while revalidating
+        'Cache-Control': 's-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     console.error("API Error fetching movies:", error);
     return NextResponse.json({ error: 'Failed to fetch movies' }, { status: 500 });
