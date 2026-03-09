@@ -54,7 +54,8 @@ const getAllMovies = unstable_cache(
         }
     },
     ['all-movies-data'],
-    { revalidate: 43200, tags: ['movies'] }
+    // revalidate: false → cache lives until scraper calls /api/revalidate (saves Firestore reads)
+    { revalidate: false, tags: ['movies'] }
 );
 
 export const getMovies = async (params: MovieSearchParams): Promise<GetMoviesResponse> => {
@@ -179,7 +180,7 @@ export const getGlobalAppStats = unstable_cache(
         }
     },
     ['global-app-stats'],
-    { revalidate: 3600, tags: ['stats'] }
+    { revalidate: false, tags: ['stats'] }
 );
 
 export const getYearlyStats = async (): Promise<YearlyStats | null> => {
@@ -214,7 +215,7 @@ export const getMovieCount = unstable_cache(
         }
     },
     ['movie-count'],
-    { revalidate: 3600, tags: ['movies'] }
+    { revalidate: false, tags: ['movies'] }
 );
 
 export async function getMovie(id: string) {

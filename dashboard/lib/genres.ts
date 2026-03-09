@@ -29,7 +29,7 @@ export const getTopGenres = unstable_cache(
         }
     },
     ['top-genres'],
-    { revalidate: 3600, tags: ['genres'] }
+    { revalidate: false, tags: ['genres'] }
 );
 
 export const getAllGenres = unstable_cache(
@@ -49,7 +49,7 @@ export const getAllGenres = unstable_cache(
         }
     },
     ['all-genres'],
-    { revalidate: 3600, tags: ['genres'] }
+    { revalidate: false, tags: ['genres'] }
 );
 
 export const getGlobalStats = async () => {
