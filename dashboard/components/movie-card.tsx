@@ -33,6 +33,7 @@ export function MovieCard({ movie }: MovieCardProps) {
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                         sizes="(max-width: 640px) 45vw, (max-width: 1080px) 220px, 200px"
+                        unoptimized
                     />
                 ) : (
                     <div className="flex flex-col items-center gap-2 opacity-20 group-hover:opacity-40 transition-opacity duration-500">

@@ -128,6 +128,7 @@ export function SearchBar() {
                                                 alt={movie.title}
                                                 fill
                                                 className="object-cover"
+                                                unoptimized
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-[8px] text-muted-foreground text-center p-1">No Poster</div>

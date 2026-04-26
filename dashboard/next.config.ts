@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     // "Image Optimization - Transformations" and "Cache Writes" usage.
     deviceSizes: [640, 1080],
     imageSizes: [128, 256, 384],
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

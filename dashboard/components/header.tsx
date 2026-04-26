@@ -42,6 +42,7 @@ export default function Header() {
               width={40}      // Розмір відображення в пікселях
               height={40}
               priority        // Додаємо цей атрибут, щоб лого завантажувалось миттєво
+              unoptimized
             />
             <div className="flex items-center text-lg md:text-xl font-bold shrink-0">
               <span className="inline md:hidden">FMD</span>
@@ -85,6 +86,7 @@ export default function Header() {
                             width={32}
                             height={32}
                             className="rounded-full object-cover"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-8 h-8 bg-muted-foreground/10 rounded-full flex items-center justify-center text-sm uppercase">

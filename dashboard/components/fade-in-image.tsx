@@ -19,6 +19,7 @@ export function FadeInImage({ className, ...props }: FadeInImageProps) {
     return (
         <Image
             {...props}
+            unoptimized
             className={cn(
                 "transition-all duration-500 ease-out",
                 isLoading ? "scale-105 blur-sm opacity-0" : "scale-100 blur-0 opacity-100",

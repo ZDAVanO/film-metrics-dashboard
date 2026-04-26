@@ -52,6 +52,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                             fill
                             className="object-cover opacity-30 blur-[2px]"
                             priority
+                            unoptimized
                         />
                     ) : (
                         <div className="w-full h-full bg-muted" />
@@ -155,6 +156,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                                         width={120}
                                                         height={120}
                                                         className="object-contain filter grayscale group-hover:grayscale-0 transition-all"
+                                                        unoptimized
                                                     />
                                                 </div>
                                             ) : (
