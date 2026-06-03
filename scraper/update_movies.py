@@ -1,7 +1,9 @@
+import datetime
 import json
 import math
 import os
 import time
+import zlib
 from collections import defaultdict
 
 import firebase_admin
@@ -351,10 +353,10 @@ def calculate_global_stats(movies):
 
 # MARK: upload_to_firebase()
 def upload_to_firebase(movies, stats, global_stats):
-    """Writes processed data to Firestore using batches and removes obsolete records."""
+    """Writes processed data to Firestore using batches, compiles a compressed document, and removes obsolete records."""
     
-    # 1. Collect new movie IDs for fast lookup
-    new_movie_ids = {str(movie["id"]) for movie in movies}
+    # Record the starting timestamp of this update run
+    run_start_time = datetime.datetime.now(datetime.timezone.utc)
 
     # --- 1. Upload movies in batches ---
     logger.info(f"Uploading {len(movies)} movies to Firestore in batches...")
@@ -365,7 +367,9 @@ def upload_to_firebase(movies, stats, global_stats):
 
         for movie in chunk:
             movie_ref = db.collection("movies").document(str(movie["id"]))
-            batch.set(movie_ref, movie)
+            # Attach the run timestamp to identify which movies are updated/active
+            movie_data = {**movie, "last_updated": run_start_time}
+            batch.set(movie_ref, movie_data)
 
         batch.commit()
         logger.info(f"  Batch {i // batch_size + 1} (movies) uploaded")
@@ -379,16 +383,22 @@ def upload_to_firebase(movies, stats, global_stats):
     batch.commit()
     db.collection("stats").document("global").set(global_stats)
 
-    # --- 3. Cleaning obsolete movies ---
+    # --- 3. Upload compressed compiled movies data ---
+    logger.info("Uploading compressed compiled movies data to movies_compiled/all...")
+    movies_json = json.dumps(movies)
+    compressed_movies = zlib.compress(movies_json.encode('utf-8'))
+    db.collection("movies_compiled").document("all").set({
+        "data": compressed_movies,
+        "updated_at": run_start_time
+    })
+
+    # --- 4. Cleaning obsolete movies ---
     logger.info("Checking for obsolete movies...")
     
-    # Get all existing document IDs in the collection
-    # Use select([]), to avoid fetching full document data (saves bandwidth)
-    existing_docs = db.collection("movies").select([]).stream()
-    existing_ids = {doc.id for doc in existing_docs}
-
-    # Find the difference: what is in the database but not in the new list
-    ids_to_delete = list(existing_ids - new_movie_ids)
+    # Query only for movies that were NOT updated in this run (timestamp is older)
+    # This costs only N reads (where N is the number of obsolete movies) instead of reading the entire collection
+    obsolete_query = db.collection("movies").where("last_updated", "<", run_start_time).stream()
+    ids_to_delete = [doc.id for doc in obsolete_query]
 
     if ids_to_delete:
         logger.info(f"Found {len(ids_to_delete)} obsolete movies. Deleting...")

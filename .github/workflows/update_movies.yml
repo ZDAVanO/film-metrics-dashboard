@@ -1,9 +1,10 @@
 name: Scheduled Movie Data Update
 
 on:
-  schedule:
-    # Runs daily at 00:00 UTC
-    - cron: "0 0 * * *"
+  # Temporarily disabled scheduled runs to prevent daily execution
+  # schedule:
+  #   # Runs daily at 00:00 UTC
+  #   - cron: "0 0 * * *"
   # Allows manual script run via the Actions tab on GitHub
   workflow_dispatch:
 

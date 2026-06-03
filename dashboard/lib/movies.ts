@@ -2,6 +2,7 @@
 
 import { getDb } from '@/lib/firebase';
 import { unstable_cache } from 'next/cache';
+import zlib from 'zlib';
 
 
 export interface Movie {
@@ -43,13 +44,25 @@ export interface MovieSearchParams {
 const getAllMovies = unstable_cache(
     async () => {
         try {
-            const snapshot = await getDb().collection('movies').get();
-            return snapshot.docs.map(doc => ({
-                ...doc.data(),
-                id: doc.id // Ensure Firestore string ID is used and not overwritten
-            })) as Movie[];
+            const doc = await getDb().collection('movies_compiled').doc('all').get();
+            if (!doc.exists) {
+                console.error("movies_compiled/all document not found");
+                return [];
+            }
+            const data = doc.data();
+            if (!data || !data.data) {
+                console.error("No data in movies_compiled/all");
+                return [];
+            }
+            
+            // Decompress the binary data. In firebase-admin, Bytes fields are returned as Buffer objects.
+            const bytes = data.data;
+            const buffer = Buffer.isBuffer(bytes) ? bytes : (bytes.toBuffer ? bytes.toBuffer() : Buffer.from(bytes));
+            
+            const decompressed = zlib.inflateSync(buffer).toString('utf-8');
+            return JSON.parse(decompressed) as Movie[];
         } catch (error) {
-            console.error("Error fetching all movies from Firestore:", error);
+            console.error("Error fetching all movies from Firestore compiled doc:", error);
             return [];
         }
     },
@@ -207,10 +220,10 @@ export const getHiddenGems = async (limit: number = 10): Promise<Movie[]> => {
 export const getMovieCount = unstable_cache(
     async (): Promise<number> => {
         try {
-            const snapshot = await getDb().collection('movies').count().get();
-            return snapshot.data().count;
+            const movies = await getAllMovies();
+            return movies.length;
         } catch (error) {
-            console.error("Error fetching movie count:", error);
+            console.error("Error calculating movie count:", error);
             return 0;
         }
     },
