@@ -353,28 +353,12 @@ def calculate_global_stats(movies):
 
 # MARK: upload_to_firebase()
 def upload_to_firebase(movies, stats, global_stats):
-    """Writes processed data to Firestore using batches, compiles a compressed document, and removes obsolete records."""
+    """Writes processed data to Firestore: genre stats, global stats, and compressed movies compilation."""
     
     # Record the starting timestamp of this update run
     run_start_time = datetime.datetime.now(datetime.timezone.utc)
 
-    # --- 1. Upload movies in batches ---
-    logger.info(f"Uploading {len(movies)} movies to Firestore in batches...")
-    batch_size = 500
-    for i in range(0, len(movies), batch_size):
-        batch = db.batch()
-        chunk = movies[i : i + batch_size]
-
-        for movie in chunk:
-            movie_ref = db.collection("movies").document(str(movie["id"]))
-            # Attach the run timestamp to identify which movies are updated/active
-            movie_data = {**movie, "last_updated": run_start_time}
-            batch.set(movie_ref, movie_data)
-
-        batch.commit()
-        logger.info(f"  Batch {i // batch_size + 1} (movies) uploaded")
-
-    # --- 2. Update stats ---
+    # --- 1. Update stats ---
     logger.info("Updating genre and global statistics...")
     batch = db.batch()
     for s in stats:
@@ -383,8 +367,8 @@ def upload_to_firebase(movies, stats, global_stats):
     batch.commit()
     db.collection("stats").document("global").set(global_stats)
 
-    # --- 3. Upload compressed compiled movies data ---
-    logger.info("Uploading compressed compiled movies data to movies_compiled/all...")
+    # --- 2. Upload compressed compiled movies data ---
+    logger.info(f"Uploading compressed compiled data ({len(movies)} movies) to movies_compiled/all...")
     movies_json = json.dumps(movies)
     compressed_movies = zlib.compress(movies_json.encode('utf-8'))
     db.collection("movies_compiled").document("all").set({
@@ -392,36 +376,13 @@ def upload_to_firebase(movies, stats, global_stats):
         "updated_at": run_start_time
     })
 
-    # --- 4. Cleaning obsolete movies ---
-    logger.info("Checking for obsolete movies...")
-    
-    # Query only for movies that were NOT updated in this run (timestamp is older)
-    # This costs only N reads (where N is the number of obsolete movies) instead of reading the entire collection
-    obsolete_query = db.collection("movies").where("last_updated", "<", run_start_time).stream()
-    ids_to_delete = [doc.id for doc in obsolete_query]
-
-    if ids_to_delete:
-        logger.info(f"Found {len(ids_to_delete)} obsolete movies. Deleting...")
-        for i in range(0, len(ids_to_delete), batch_size):
-            batch = db.batch()
-            chunk_to_delete = ids_to_delete[i : i + batch_size]
-            
-            for doc_id in chunk_to_delete:
-                doc_ref = db.collection("movies").document(doc_id)
-                batch.delete(doc_ref)
-                
-            batch.commit()
-            logger.info(f"  Deleted batch of {len(chunk_to_delete)} old movies")
-    else:
-        logger.info("No obsolete movies to remove")
-
     logger.info("Data synchronization complete")
 
 
 # MARK: clear_firestore()
 def clear_firestore():
     """Deletes all documents from the primary collections."""
-    collections = ["movies", "genres", "stats"]
+    collections = ["movies", "genres", "stats", "movies_compiled"]
     for col in collections:
         db.recursive_delete(db.collection(col))
         logger.info(f"Deleted all documents from collection '{col}'")
